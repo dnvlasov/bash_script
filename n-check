@@ -1,0 +1,38 @@
+#Script check  DNS zone  and reload. 
+#!/bin/bash
+CHECK_Z=$(which named-checkzone)
+RNDC=$(which rndc)
+I_PATH=$1
+if [ -z "$I_PATH" ];then
+  printf "\nYou did not specify the path to the zone file\n\v"
+exit
+fi
+
+F_ZONE=$(cat $I_PATH | grep -i soa | awk '{print$1}')
+TEST_Z=$($CHECK_Z $F_ZONE  $I_PATH)
+
+if [ "$?" -eq "0" ];then
+  printf "\n File zone $I_PATH is OK\n\v"
+else
+  printf "\n Error config zone DNS bye\n\v"
+exit
+fi
+
+printf "Reload zone $I_PATH [y/n]: "
+read ZONE
+  case $ZONE in
+  y|Y)
+      msg=$($RNDC reload $F_ZONE)
+     if [ "$msg" == 'zone reload up-to-date' ];then
+         printf "  \n  ZONE $F_ZONE NOT RELOAD!!!\n  You do not change the serial number of the zone\n\v"
+     else
+      printf "\n OK  $msg \n\v"
+    fi
+  ;;
+  n|N) printf "\n Not reload zone and exit.\n\v"
+     exit
+  ;;
+  *) printf  "\n`basename $0` : Unknown command! Exit. \n\v">&2
+
+  ;;
+esac

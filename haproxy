@@ -1,0 +1,28 @@
+#!/usr/bin/bash
+haexe=$(which haproxy)
+conf="/etc/haproxy/haproxy.cfg"
+$haexe -c -V -f $conf >&2
+
+if [ $? == 0 ];then
+   printf "\n Haproxy config  $conf   is OK\n\v"
+else
+   ptintf "\n Haproxy config $conf is wrong\n\v"
+   exit
+fi
+
+echo -n " Reload haproxy config $conf [y/n]: "
+ read RELOAD
+case $RELOAD in
+ y|Y) printf "\n Reload $conf\n\v"
+      sudo systemctl stop haproxy;
+      sudo systemctl start haproxy;
+      printf "\n Haproxy reload see status\n\v"
+      sudo systemctl status haproxy;
+;;
+ n|N)
+     printf "\n Not reload haproxy bye\n\v"
+ exit
+;;
+*) echo "`basename $0` : No unknow command, bye " >&2
+;;
+esac

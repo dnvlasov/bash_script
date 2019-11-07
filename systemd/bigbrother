@@ -4,7 +4,7 @@
 case "$1" in
 start)
  echo "$(date) service bigbrother  started" >> /var/log/bigbrother.log
-/opt/bigbrother.sh &
+/path/bigbrother.sh &
 echo $!>/var/run/bigbrother.pid
 ;;
 stop) 

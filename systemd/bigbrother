@@ -1,0 +1,33 @@
+#!/bin/bash
+#chkconfig 2345 20 80
+#decrtiption: check apache config
+case "$1" in
+start)
+ echo "$(date) service bigbrother  started" >> /var/log/bigbrother.log
+/opt/bigbrother.sh &
+echo $!>/var/run/bigbrother.pid
+;;
+stop) 
+echo "$(date) service bigbrother stop" >> /var/log/bigbrother.log
+IDs="$(cat /var/run/bigbrother.pid)"
+kill $IDs
+rm /var/run/bigbrother.pid
+;;
+restart)
+$0 stop
+$0 start
+;;
+status)
+if [ -e /var/run/bigbrother.pid ]; then
+ echo bigbrother is running, pid='cat /var/run/bigbrother.pid'
+else
+ echo bigbrother is not running
+ exit 1
+fi
+;;
+*)
+echo "Usage: $0 (start|stop|status|restart)"
+esac
+
+exit 0
+

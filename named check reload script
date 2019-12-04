@@ -1,0 +1,170 @@
+#!/usr/bin/bash
+#colours text console
+red=$'\e[1;31m'
+grn=$'\e[1;32m'
+yel=$'\e[1;33m'
+blu=$'\e[1;34m'
+mag=$'\e[1;35m'
+cyn=$'\e[1;36m'
+end=$'\e[0m'
+
+CHECK_Z="$(which named-checkzone)"
+CHECK_C="$(which named-checkconf)"
+RNDC="$(which rndc)"
+BACKUP="/backup/"
+I_PATH="$1"
+F_ZONE="$(cat $I_PATH | grep -i soa | cut -f1 | sed  's/\.$//')"
+#---timer 10s
+timer(){
+while true;do echo -n .;sleep 1;done &
+sleep 10  # or do something else here
+kill $!; trap 'kill $!' SIGTERM
+echo " "OK
+}
+zonedump(){
+$CHECK_Z -i none  -o /tmp/new.zone $F_ZONE $I_PATH
+$CHECK_Z -i none  -o /tmp/old.zone  $F_ZONE $BACKUP$F_ZONE.zone
+}
+
+#printf "\v\t\t==========================================================="
+printf "\n\t\t\t\t${grn}Start script check reload zone!!!${end}\n"
+printf "\t\t==========================================================="
+
+if [ -z "$I_PATH" ];then
+  printf "\n%s ${yel} You did not specify the path to the zone file${end}\n\v"
+exit
+fi
+
+#F_ZONE=$(cat $I_PATH | grep -i soa | cut -d . -f -2)
+
+if [ !  -f  "$BACKUP$F_ZONE.zone" ];then
+ printf "\v\n%s File zone none in  backup folder $BACKUP"
+ printf "\n%s Please copy file $F_ZONE.zone BACKUP folder and run again\n\v"
+exit
+fi
+
+TEST_C="$($CHECK_C /etc/named.conf)"
+if  [ "$?" -eq "0" ]  ;then
+   printf   "\v\n%s Config named.conf ...${grn}OK${end}\n"
+else
+   printf   "\n%s Config named.conf $TEST_C ...${red}FAIL${end}\n"
+  exit
+fi
+
+TEST_Z="$($CHECK_C /var/named/zones.list)"
+if [ "$?" -eq "0" ];then
+  printf   "\n%s Config zones.list ...${grn}OK${end}\n\v"
+else
+   printf   "\n%s  Config zone.list $TEST_Z ...${red}FAIL${end}\n\v"
+  exit
+fi
+
+printf "\n\t\t\t\t ${grn}Check  zone file${end}\n"
+printf "\t\t===========================================================\n"
+$CHECK_Z   $F_ZONE $I_PATH
+ if [ "$?" != "0" ];then
+  printf "\n${red}Errored zone file!!!  Pleace edit his and again start script.${end}\n\v"
+  exit
+ else
+printf "\nConfig zone file $I_PATH ...${grn}OK${end}\n"
+fi
+
+#function named-checkzone dump
+zonedump >/dev/null
+
+
+#printf "\v\t\t==========================================================="
+printf "\n\t\t\t\t${grn} Check  diff  zone file ${end}\n"
+printf "\t\t===========================================================\n"
+
+printf "${blu} New file zone $I_PATH \t\t   Backup file zone $BACKUP$F_ZONE.zone ${end}\n"
+printf "===========================================================================================================\n"
+sdiff -s $I_PATH $BACKUP$F_ZONE.zone
+if [ "$?" -eq "0" ];then
+printf "\n\t\t\t\t${grn} No changes found.${end}\n\v"
+printf "==========================================================================================================="
+fi
+printf "\n\t\t\t\t${grn} Dump zone file${end} \n"
+printf "\t\t===========================================================\n"
+printf "${blu} New file zone $I_PATH \t\t   Backup file zone $BACKUP$F_ZONE.zone ${end}\n"
+printf "===========================================================================================================\n"
+SDiff="$(sdiff -s /tmp/new.zone  /tmp/old.zone)"
+printf "$SDiff\n"
+#sdiff -s /tmp/new.zone /tmp/old.zone | tee /tmp/newd.zome
+
+if [ -z "$SDiff" ];then
+printf "\n\t\t\t\t${grn} No changes found.${end}\n\v"
+printf "===========================================================================================================\n"
+fi
+
+printf "\v %s ${mag}Reload zone $I_PATH [y/n]:${end} "
+read READ
+case $READ in
+   y|Y)
+   msg=$($RNDC reload $F_ZONE)
+     if [ "$msg" == 'zone reload up-to-date' ];then
+         printf "  \n  ${red}ZONE $F_ZONE NOT RELOAD!!!\n  You did not change the serial number of the zone${end}\n\v"
+      else
+      printf "\n ${grn} OK  $msg ${end} \n\v"
+      printf "\n ${grn} Log file /var/named/log/named.run${end} \n"
+      echo "----------------------------------------------------------"
+      tail -n 500  /var/named/log/named.run | grep -E 'loaded|warning|reload'
+      echo "----------------------------------------------------------"
+if [ -n "$SDiff" ];then
+   printf "\n\t\t\t${grn} Nslookup localhost ns1.vtb.com.${end}\n"
+   printf "\t\t==================================================\n"
+   for i in `echo "${SDiff}"|cut -f1`;do
+      nslookup $i 127.0.0.1 >/dev/null
+      if [ $? -eq 0 ]; then
+         printf "\nAdd domain $i ...${grn}OK${end} \n"
+      else
+         printf "\nAdd domain $i ...${red}FAIL${end}\n"
+      fi
+    done
+
+   printf "\n\t\t\t${grn}Wait add secondary zone new domain.${end}\n"
+   printf "\t\t==================================================\n"
+   printf ${grn}"\n Wait 10s "
+      timer ${end}
+   printf "\n\t\t\t${grn} Nslookup 172.16.254.163 ns2.vtb.com.${end}\n"
+   printf "\t\t==================================================\n"
+   for i in `echo "${SDiff}"|cut -f1`;do
+      nslookup $i 172.16.254.163 >/dev/null
+      if [ $? -eq 0 ]; then
+         printf "\nAdd domain $i ...${grn}OK${end} \n"
+      else
+         printf "\nAdd domain $i ...${red}FAIL${end}\n"
+      fi
+     done
+else
+   printf "\n\t\t\t${grn} Not add  new domains.${end}\n"
+   printf "\t\t==================================================\n"
+   fi
+  fi
+ ;;
+  n|N) printf "\n${grn} Not reload zone and exit.${end}\n\v"
+   exit
+  ;;
+  *) printf  "${red}\n`basename $0` : Unknown command! Exit.${end} \n\v">&2
+
+  ;;
+  esac
+
+printf "\n\t\t\t${grn} Check important domains after reboot zone.${end}\n"
+printf "\t\t===========================================================\n"
+
+for i in check old domain; do
+ nslookup $i >/dev/null
+    if [ $? -eq 0 ]; then
+         printf "\n $i ...${grn}OK${end} \n"
+      else
+         printf "\n $i ...${red}FAIL${end}\n"
+      fi
+    done
+
+
+cp  $BACKUP$F_ZONE.zone $BACKUP$F_ZONE.zone.`date +%m%d%H%M%y`
+cp  $I_PATH $BACKUP
+printf "\n=========="
+printf "${grn} END Script check zone and reload.${end} ==========\n\v"
+

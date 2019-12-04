@@ -35,8 +35,6 @@ if [ -z "$I_PATH" ];then
 exit
 fi
 
-#F_ZONE=$(cat $I_PATH | grep -i soa | cut -d . -f -2)
-
 if [ !  -f  "$BACKUP$F_ZONE.zone" ];then
  printf "\v\n%s File zone none in  backup folder $BACKUP"
  printf "\n%s Please copy file $F_ZONE.zone BACKUP folder and run again\n\v"
@@ -90,7 +88,6 @@ printf "${blu} New file zone $I_PATH \t\t   Backup file zone $BACKUP$F_ZONE.zone
 printf "===========================================================================================================\n"
 SDiff="$(sdiff -s /tmp/new.zone  /tmp/old.zone)"
 printf "$SDiff\n"
-#sdiff -s /tmp/new.zone /tmp/old.zone | tee /tmp/newd.zome
 
 if [ -z "$SDiff" ];then
 printf "\n\t\t\t\t${grn} No changes found.${end}\n\v"
@@ -167,4 +164,3 @@ cp  $BACKUP$F_ZONE.zone $BACKUP$F_ZONE.zone.`date +%m%d%H%M%y`
 cp  $I_PATH $BACKUP
 printf "\n=========="
 printf "${grn} END Script check zone and reload.${end} ==========\n\v"
-
